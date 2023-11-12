@@ -50,7 +50,12 @@ func main() {
 	e.Use(session.Middleware(sessions.NewCookieStore([]byte("trapnomura"))))
 
 	db, _ := GetDB(false)
-	db.SetMaxOpenConns(10)
+	db.SetMaxOpenConns(1024)
+	db.SetMaxIdleConns(-1)
+
+	http.DefaultTransport.(*http.Transport).MaxIdleConns = 0           // infinite
+	http.DefaultTransport.(*http.Transport).MaxIdleConnsPerHost = 1024 // default: 2
+	http.DefaultTransport.(*http.Transport).ForceAttemptHTTP2 = true   // go1.13以上
 
 	h := &handlers{
 		DB: db,
