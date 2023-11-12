@@ -36,6 +36,7 @@ type handlers struct {
 }
 
 func main() {
+	fmt.Println("8888 start")
 	go standalone.Integrate(":8888")
 
 	e := echo.New()
@@ -96,7 +97,9 @@ type InitializeResponse struct {
 
 // Initialize POST /initialize 初期化エンドポイント
 func (h *handlers) Initialize(c echo.Context) error {
+	fmt.Println("Initialized")
 	go func() {
+		fmt.Println("Pprotein start")
 		if _, err := http.Get("http://p.isucon.ikura-hamu.work/api/group/collect"); err != nil {
 			fmt.Printf("failed to communicate with pprotein: %v", err)
 		}
