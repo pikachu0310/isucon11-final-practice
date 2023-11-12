@@ -13,6 +13,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/go-sql-driver/mysql"
 	"github.com/gorilla/sessions"
@@ -96,13 +97,22 @@ type InitializeResponse struct {
 }
 
 // Initialize POST /initialize 初期化エンドポイント
+var pproteined bool
+
 func (h *handlers) Initialize(c echo.Context) error {
-	fmt.Println("Initialized")
+	fmt.Println("Initialize Start")
 	go func() {
-		fmt.Println("Pprotein start")
+		if pproteined {
+			return
+		}
 		if _, err := http.Get("http://p.isucon.ikura-hamu.work/api/group/collect"); err != nil {
 			fmt.Printf("failed to communicate with pprotein: %v", err)
 		}
+		pproteined = true
+		go func() {
+			time.Sleep(20 * time.Second)
+			pproteined = false
+		}()
 	}()
 
 	dbForInit, _ := GetDB(true)
