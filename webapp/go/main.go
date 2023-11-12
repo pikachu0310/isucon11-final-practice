@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"github.com/kaz/pprotein/integration/standalone"
 	"io"
 	"net/http"
 	"net/url"
@@ -35,6 +36,8 @@ type handlers struct {
 }
 
 func main() {
+	go standalone.Integrate(":8888")
+	
 	e := echo.New()
 	e.Debug = GetEnv("DEBUG", "") == "true"
 	e.Server.Addr = fmt.Sprintf(":%v", GetEnv("PORT", "7000"))
@@ -93,6 +96,12 @@ type InitializeResponse struct {
 
 // Initialize POST /initialize 初期化エンドポイント
 func (h *handlers) Initialize(c echo.Context) error {
+	go func() {
+		if _, err := http.Get("https://pprotein2.ikura-hamu.trap.show/api/group/collect"); err != nil {
+			fmt.Printf("failed to communicate with pprotein: %v", err)
+		}
+	}()
+
 	dbForInit, _ := GetDB(true)
 
 	files := []string{
@@ -1250,7 +1259,7 @@ func (h *handlers) DownloadSubmittedAssignments(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
-	if _, err := tx.Exec("UPDATE `classes` SET `submission_closed` = true WHERE `id` = ?", classID); err != nil {
+	if _, err := tx.Exec("UPDATE `classes` SET `submission_closed` = TRUE WHERE `id` = ?", classID); err != nil {
 		c.Logger().Error(err)
 		return c.NoContent(http.StatusInternalServerError)
 	}
@@ -1530,7 +1539,7 @@ func (h *handlers) GetAnnouncementDetail(c echo.Context) error {
 		return c.String(http.StatusNotFound, "No such announcement.")
 	}
 
-	if _, err := tx.Exec("UPDATE `unread_announcements` SET `is_deleted` = true WHERE `announcement_id` = ? AND `user_id` = ?", announcementID, userID); err != nil {
+	if _, err := tx.Exec("UPDATE `unread_announcements` SET `is_deleted` = TRUE WHERE `announcement_id` = ? AND `user_id` = ?", announcementID, userID); err != nil {
 		c.Logger().Error(err)
 		return c.NoContent(http.StatusInternalServerError)
 	}
