@@ -1,16 +1,19 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
 	"github.com/kaz/pprotein/integration/standalone"
+	"github.com/motoki317/sc"
 	"io"
 	"net"
 	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -37,6 +40,45 @@ type handlers struct {
 	DB *sqlx.DB
 }
 
+func stmtClose(stmt *sqlx.Stmt) {
+	_ = stmt.Close()
+}
+
+var stmtCache = sc.NewMust(func(ctx context.Context, query string) (*sqlx.Stmt, error) {
+	stmt, err := db.PreparexContext(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	runtime.SetFinalizer(stmt, stmtClose)
+	return stmt, nil
+}, 90*time.Second, 90*time.Second)
+
+func dbExec(query string, args ...any) (sql.Result, error) {
+	stmt, err := stmtCache.Get(context.Background(), query)
+	if err != nil {
+		return nil, err
+	}
+	return stmt.Exec(args...)
+}
+
+func dbGet(dest interface{}, query string, args ...interface{}) error {
+	stmt, err := stmtCache.Get(context.Background(), query)
+	if err != nil {
+		return err
+	}
+	return stmt.Get(dest, args...)
+}
+
+func dbSelect(dest interface{}, query string, args ...interface{}) error {
+	stmt, err := stmtCache.Get(context.Background(), query)
+	if err != nil {
+		return err
+	}
+	return stmt.Select(dest, args...)
+}
+
+var db *sqlx.DB
+
 func main() {
 	fmt.Println("8888 start")
 	go standalone.Integrate(":8888")
@@ -50,7 +92,7 @@ func main() {
 	e.Use(middleware.Recover())
 	e.Use(session.Middleware(sessions.NewCookieStore([]byte("trapnomura"))))
 
-	db, _ := GetDB(false)
+	db, _ = GetDB(false)
 	db.SetMaxOpenConns(1024)
 	db.SetMaxIdleConns(-1)
 
