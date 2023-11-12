@@ -37,7 +37,7 @@ type handlers struct {
 
 func main() {
 	go standalone.Integrate(":8888")
-	
+
 	e := echo.New()
 	e.Debug = GetEnv("DEBUG", "") == "true"
 	e.Server.Addr = fmt.Sprintf(":%v", GetEnv("PORT", "7000"))
@@ -97,7 +97,7 @@ type InitializeResponse struct {
 // Initialize POST /initialize 初期化エンドポイント
 func (h *handlers) Initialize(c echo.Context) error {
 	go func() {
-		if _, err := http.Get("https://pprotein2.ikura-hamu.trap.show/api/group/collect"); err != nil {
+		if _, err := http.Get("http://p.isucon.ikura-hamu.work/api/group/collect"); err != nil {
 			fmt.Printf("failed to communicate with pprotein: %v", err)
 		}
 	}()
