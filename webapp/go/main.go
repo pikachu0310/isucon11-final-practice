@@ -77,6 +77,30 @@ func dbSelect(dest interface{}, query string, args ...interface{}) error {
 	return stmt.Select(dest, args...)
 }
 
+func txExec(tx *sqlx.Tx, query string, args ...any) (sql.Result, error) {
+	stmt, err := stmtCache.Get(context.Background(), query)
+	if err != nil {
+		return nil, err
+	}
+	return tx.Stmtx(stmt).Exec(args...)
+}
+
+func txGet(tx *sqlx.Tx, dest interface{}, query string, args ...interface{}) error {
+	stmt, err := stmtCache.Get(context.Background(), query)
+	if err != nil {
+		return err
+	}
+	return tx.Stmtx(stmt).Get(dest, args...)
+}
+
+func txSelect(tx *sqlx.Tx, dest interface{}, query string, args ...interface{}) error {
+	stmt, err := stmtCache.Get(context.Background(), query)
+	if err != nil {
+		return err
+	}
+	return tx.Stmtx(stmt).Select(dest, args...)
+}
+
 var db *sqlx.DB
 
 func main() {
