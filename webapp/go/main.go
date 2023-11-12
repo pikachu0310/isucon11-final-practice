@@ -1234,6 +1234,7 @@ func (h *handlers) SubmitAssignment(c echo.Context) error {
 	eg.Go(func() error {
 		err := txGet(tx, &status, "SELECT `status` FROM `courses` WHERE `id` = ? FOR SHARE", courseID)
 		if err != nil {
+			fmt.Println("bad1")
 			return err
 		}
 		return nil
@@ -1242,6 +1243,7 @@ func (h *handlers) SubmitAssignment(c echo.Context) error {
 	eg.Go(func() error {
 		err := txGet(tx, &registrationCount, "SELECT COUNT(*) FROM `registrations` WHERE `user_id` = ? AND `course_id` = ?", userID, courseID)
 		if err != nil {
+			fmt.Println("bad2")
 			return err
 		}
 		return nil
@@ -1250,6 +1252,7 @@ func (h *handlers) SubmitAssignment(c echo.Context) error {
 	eg.Go(func() error {
 		err := txGet(tx, &submissionClosed, "SELECT `submission_closed` FROM `classes` WHERE `id` = ? FOR SHARE", classID)
 		if err != nil {
+			fmt.Println("bad3")
 			return err
 		}
 		return nil
