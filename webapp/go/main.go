@@ -252,7 +252,7 @@ func (h *handlers) Initialize(c echo.Context) error {
 	res := InitializeResponse{
 		Language: "go",
 	}
-	return c.JSON(http.StatusOK, res)
+	return c.JSONBlob(http.StatusOK, jsonEncode(res))
 }
 
 // IsLoggedIn ログイン確認用middleware
@@ -467,11 +467,11 @@ func (h *handlers) GetMe(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
-	return c.JSON(http.StatusOK, GetMeResponse{
+	return c.JSONBlob(http.StatusOK, jsonEncode(GetMeResponse{
 		Code:    userCode,
 		Name:    userName,
 		IsAdmin: isAdmin,
-	})
+	}))
 }
 
 type GetRegisteredCourseResponseContent struct {
@@ -530,7 +530,7 @@ func (h *handlers) GetRegisteredCourses(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
-	return c.JSON(http.StatusOK, res)
+	return c.JSONBlob(http.StatusOK, jsonEncode(res))
 }
 
 type RegisterCourseRequestContent struct {
@@ -618,7 +618,7 @@ func (h *handlers) RegisterCourses(c echo.Context) error {
 	}
 
 	if len(errors.CourseNotFound) > 0 || len(errors.NotRegistrableStatus) > 0 || len(errors.ScheduleConflict) > 0 {
-		return c.JSON(http.StatusBadRequest, errors)
+		return c.JSONBlob(http.StatusBadRequest, jsonEncode(errors))
 	}
 
 	for _, course := range newlyAdded {
@@ -820,7 +820,7 @@ func (h *handlers) GetGrades(c echo.Context) error {
 		CourseResults: courseResults,
 	}
 
-	return c.JSON(http.StatusOK, res)
+	return c.JSONBlob(http.StatusOK, jsonEncode(res))
 }
 
 // ---------- Courses API ----------
@@ -932,7 +932,7 @@ func (h *handlers) SearchCourses(c echo.Context) error {
 		res = res[:len(res)-1]
 	}
 
-	return c.JSON(http.StatusOK, res)
+	return c.JSONBlob(http.StatusOK, jsonEncode(res))
 }
 
 type AddCourseRequest struct {
@@ -983,13 +983,13 @@ func (h *handlers) AddCourse(c echo.Context) error {
 			if req.Type != course.Type || req.Name != course.Name || req.Description != course.Description || req.Credit != int(course.Credit) || req.Period != int(course.Period) || req.DayOfWeek != course.DayOfWeek || req.Keywords != course.Keywords {
 				return c.String(http.StatusConflict, "A course with the same code already exists.")
 			}
-			return c.JSON(http.StatusCreated, AddCourseResponse{ID: course.ID})
+			return c.JSONBlob(http.StatusCreated, jsonEncode(AddCourseResponse{ID: course.ID}))
 		}
 		c.Logger().Error(err)
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
-	return c.JSON(http.StatusCreated, AddCourseResponse{ID: courseID})
+	return c.JSONBlob(http.StatusCreated, jsonEncode(AddCourseResponse{ID: courseID}))
 }
 
 type GetCourseDetailResponse struct {
@@ -1023,7 +1023,7 @@ func (h *handlers) GetCourseDetail(c echo.Context) error {
 		return c.String(http.StatusNotFound, "No such course.")
 	}
 
-	return c.JSON(http.StatusOK, res)
+	return c.JSONBlob(http.StatusOK, jsonEncode(res))
 }
 
 type SetCourseStatusRequest struct {
@@ -1142,7 +1142,7 @@ func (h *handlers) GetClasses(c echo.Context) error {
 		})
 	}
 
-	return c.JSON(http.StatusOK, res)
+	return c.JSONBlob(http.StatusOK, jsonEncode(res))
 }
 
 type AddClassRequest struct {
@@ -1195,7 +1195,7 @@ func (h *handlers) AddClass(c echo.Context) error {
 			if req.Title != class.Title || req.Description != class.Description {
 				return c.String(http.StatusConflict, "A class with the same part already exists.")
 			}
-			return c.JSON(http.StatusCreated, AddClassResponse{ClassID: class.ID})
+			return c.JSONBlob(http.StatusCreated, jsonEncode(AddClassResponse{ClassID: class.ID}))
 		}
 		c.Logger().Error(err)
 		return c.NoContent(http.StatusInternalServerError)
@@ -1206,7 +1206,7 @@ func (h *handlers) AddClass(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
-	return c.JSON(http.StatusCreated, AddClassResponse{ClassID: classID})
+	return c.JSONBlob(http.StatusCreated, jsonEncode(AddClassResponse{ClassID: classID}))
 }
 
 // SubmitAssignment POST /api/courses/:courseID/classes/:classID/assignments 課題の提出
@@ -1524,10 +1524,10 @@ func (h *handlers) GetAnnouncementList(c echo.Context) error {
 	// 対象になっているお知らせが0件の時は空配列を返却
 	announcementsRes := append(make([]AnnouncementWithoutDetail, 0, len(announcements)), announcements...)
 
-	return c.JSON(http.StatusOK, GetAnnouncementsResponse{
+	return c.JSONBlob(http.StatusOK, jsonEncode(GetAnnouncementsResponse{
 		UnreadCount:   unreadCount,
 		Announcements: announcementsRes,
-	})
+	}))
 }
 
 type Announcement struct {
@@ -1668,5 +1668,5 @@ func (h *handlers) GetAnnouncementDetail(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
-	return c.JSON(http.StatusOK, announcement)
+	return c.JSONBlob(http.StatusOK, jsonEncode(announcement))
 }
