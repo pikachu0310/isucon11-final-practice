@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/kaz/pprotein/integration/standalone"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -94,7 +95,31 @@ func main() {
 		}
 	}
 
-	e.Logger.Error(e.StartServer(e.Server))
+	if os.Getenv("USE_SOCKET") == "1" {
+		fmt.Println("USE_SOCKET")
+
+		// ここからソケット接続設定 ---
+		socket_file := "/tmp/app.sock"
+		os.Remove(socket_file)
+
+		l, err := net.Listen("unix", socket_file)
+		if err != nil {
+			e.Logger.Fatal(err)
+		}
+
+		// go runユーザとnginxのユーザ（グループ）を同じにすれば777じゃなくてok
+		err = os.Chmod(socket_file, 0777)
+		if err != nil {
+			e.Logger.Fatal(err)
+		}
+
+		e.Listener = l
+		e.Logger.Fatal(e.StartServer(e.Server))
+		// ここまで ---
+	} else {
+		fmt.Println("USE_TCP")
+		e.Logger.Error(e.StartServer(e.Server))
+	}
 }
 
 type InitializeResponse struct {
