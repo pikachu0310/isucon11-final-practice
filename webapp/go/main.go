@@ -55,7 +55,7 @@ func main() {
 
 	http.DefaultTransport.(*http.Transport).MaxIdleConns = 0           // infinite
 	http.DefaultTransport.(*http.Transport).MaxIdleConnsPerHost = 1024 // default: 2
-	http.DefaultTransport.(*http.Transport).ForceAttemptHTTP2 = true   // go1.13以上
+	//http.DefaultTransport.(*http.Transport).ForceAttemptHTTP2 = true   // go1.13以上
 
 	h := &handlers{
 		DB: db,
