@@ -8,6 +8,7 @@ import (
 	"github.com/bytedance/sonic"
 	"github.com/kaz/pprotein/integration/standalone"
 	"github.com/motoki317/sc"
+	"golang.org/x/sync/errgroup"
 	"io"
 	"net"
 	"net/http"
@@ -18,7 +19,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/go-sql-driver/mysql"
@@ -1229,38 +1229,48 @@ func (h *handlers) SubmitAssignment(c echo.Context) error {
 	var status CourseStatus
 	var registrationCount int
 	var submissionClosed bool
-	var wg sync.WaitGroup
-	var queryErr error
-	wg.Add(3)
+	var eg errgroup.Group
 
-	go func() {
-		defer wg.Done()
-		if err := txGet(tx, &status, "SELECT `status` FROM `courses` WHERE `id` = ? FOR SHARE", courseID); err != nil {
-			queryErr = err
+	eg.Go(func() error {
+		err := txGet(tx, &status, "SELECT `status` FROM `courses` WHERE `id` = ? FOR SHARE", courseID)
+		if err != nil {
+			return err
 		}
-	}()
+		return nil
+	})
 
-	go func() {
-		defer wg.Done()
-		if err := txGet(tx, &registrationCount, "SELECT COUNT(*) FROM `registrations` WHERE `user_id` = ? AND `course_id` = ?", userID, courseID); err != nil {
-			queryErr = err
+	eg.Go(func() error {
+		err := txGet(tx, &registrationCount, "SELECT COUNT(*) FROM `registrations` WHERE `user_id` = ? AND `course_id` = ?", userID, courseID)
+		if err != nil {
+			return err
 		}
-	}()
+		return nil
+	})
 
-	go func() {
-		defer wg.Done()
-		if err := txGet(tx, &submissionClosed, "SELECT `submission_closed` FROM `classes` WHERE `id` = ? FOR SHARE", classID); err != nil {
-			queryErr = err
+	eg.Go(func() error {
+		err := txGet(tx, &submissionClosed, "SELECT `submission_closed` FROM `classes` WHERE `id` = ? FOR SHARE", classID)
+		if err != nil {
+			return err
 		}
-	}()
+		return nil
+	})
 
-	wg.Wait()
-	if queryErr != nil {
+	err = eg.Wait()
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return c.String(http.StatusNotFound, "No such course.")
+		}
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
-	if status != StatusInProgress || registrationCount == 0 || submissionClosed {
-		return c.String(http.StatusBadRequest, "Invalid request.")
+	if status != StatusInProgress {
+		return c.String(http.StatusBadRequest, "This course is not in progress.")
+	}
+	if registrationCount == 0 {
+		return c.String(http.StatusBadRequest, "You have not taken this course.")
+	}
+	if submissionClosed {
+		return c.String(http.StatusBadRequest, "Submission has been closed for this class.")
 	}
 
 	file, header, err := c.Request().FormFile("file")
