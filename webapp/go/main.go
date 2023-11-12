@@ -18,6 +18,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-sql-driver/mysql"
@@ -1213,7 +1214,6 @@ func (h *handlers) AddClass(c echo.Context) error {
 func (h *handlers) SubmitAssignment(c echo.Context) error {
 	userID, _, _, err := getUserInfo(c)
 	if err != nil {
-		c.Logger().Error(err)
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
@@ -1222,40 +1222,45 @@ func (h *handlers) SubmitAssignment(c echo.Context) error {
 
 	tx, err := h.DB.Beginx()
 	if err != nil {
-		c.Logger().Error(err)
 		return c.NoContent(http.StatusInternalServerError)
 	}
 	defer tx.Rollback()
 
 	var status CourseStatus
-	if err := txGet(tx, &status, "SELECT `status` FROM `courses` WHERE `id` = ? FOR SHARE", courseID); err != nil && err != sql.ErrNoRows {
-		c.Logger().Error(err)
-		return c.NoContent(http.StatusInternalServerError)
-	} else if err == sql.ErrNoRows {
-		return c.String(http.StatusNotFound, "No such course.")
-	}
-	if status != StatusInProgress {
-		return c.String(http.StatusBadRequest, "This course is not in progress.")
-	}
-
 	var registrationCount int
-	if err := txGet(tx, &registrationCount, "SELECT COUNT(*) FROM `registrations` WHERE `user_id` = ? AND `course_id` = ?", userID, courseID); err != nil {
-		c.Logger().Error(err)
+	var submissionClosed bool
+	var wg sync.WaitGroup
+	var queryErr error
+	wg.Add(3)
+
+	go func() {
+		defer wg.Done()
+		if err := txGet(tx, &status, "SELECT `status` FROM `courses` WHERE `id` = ? FOR SHARE", courseID); err != nil {
+			queryErr = err
+		}
+	}()
+
+	go func() {
+		defer wg.Done()
+		if err := txGet(tx, &registrationCount, "SELECT COUNT(*) FROM `registrations` WHERE `user_id` = ? AND `course_id` = ?", userID, courseID); err != nil {
+			queryErr = err
+		}
+	}()
+
+	go func() {
+		defer wg.Done()
+		if err := txGet(tx, &submissionClosed, "SELECT `submission_closed` FROM `classes` WHERE `id` = ? FOR SHARE", classID); err != nil {
+			queryErr = err
+		}
+	}()
+
+	wg.Wait()
+	if queryErr != nil {
 		return c.NoContent(http.StatusInternalServerError)
-	}
-	if registrationCount == 0 {
-		return c.String(http.StatusBadRequest, "You have not taken this course.")
 	}
 
-	var submissionClosed bool
-	if err := txGet(tx, &submissionClosed, "SELECT `submission_closed` FROM `classes` WHERE `id` = ? FOR SHARE", classID); err != nil && err != sql.ErrNoRows {
-		c.Logger().Error(err)
-		return c.NoContent(http.StatusInternalServerError)
-	} else if err == sql.ErrNoRows {
-		return c.String(http.StatusNotFound, "No such class.")
-	}
-	if submissionClosed {
-		return c.String(http.StatusBadRequest, "Submission has been closed for this class.")
+	if status != StatusInProgress || registrationCount == 0 || submissionClosed {
+		return c.String(http.StatusBadRequest, "Invalid request.")
 	}
 
 	file, header, err := c.Request().FormFile("file")
@@ -1265,24 +1270,20 @@ func (h *handlers) SubmitAssignment(c echo.Context) error {
 	defer file.Close()
 
 	if _, err := txExec(tx, "INSERT INTO `submissions` (`user_id`, `class_id`, `file_name`) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE `file_name` = VALUES(`file_name`)", userID, classID, header.Filename); err != nil {
-		c.Logger().Error(err)
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
 	data, err := io.ReadAll(file)
 	if err != nil {
-		c.Logger().Error(err)
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
 	dst := AssignmentsDirectory + classID + "-" + userID + ".pdf"
 	if err := os.WriteFile(dst, data, 0666); err != nil {
-		c.Logger().Error(err)
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
 	if err := tx.Commit(); err != nil {
-		c.Logger().Error(err)
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
