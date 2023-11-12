@@ -114,7 +114,7 @@ func main() {
 		}
 
 		e.Listener = l
-		e.Logger.Fatal(e.StartServer(e.Server))
+		e.Logger.Fatal(e.Start(""))
 		// ここまで ---
 	} else {
 		fmt.Println("USE_TCP")
