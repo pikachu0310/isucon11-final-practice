@@ -1332,33 +1332,6 @@ func (h *handlers) GetAnnouncementList(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
-	tx, err := h.DB.Beginx()
-	if err != nil {
-		c.Logger().Error(err)
-		return c.NoContent(http.StatusInternalServerError)
-	}
-	defer tx.Rollback()
-
-	var announcements []AnnouncementWithoutDetail
-	var args []interface{}
-	query := "SELECT `announcements`.`id`, `courses`.`id` AS `course_id`, `courses`.`name` AS `course_name`, `announcements`.`title`, NOT `unread_announcements`.`is_deleted` AS `unread`" +
-		" FROM `announcements`" +
-		" JOIN `courses` ON `announcements`.`course_id` = `courses`.`id`" +
-		" JOIN `registrations` ON `courses`.`id` = `registrations`.`course_id`" +
-		" JOIN `unread_announcements` ON `announcements`.`id` = `unread_announcements`.`announcement_id`" +
-		" WHERE 1=1"
-
-	if courseID := c.QueryParam("course_id"); courseID != "" {
-		query += " AND `announcements`.`course_id` = ?"
-		args = append(args, courseID)
-	}
-
-	query += " AND `unread_announcements`.`user_id` = ?" +
-		" AND `registrations`.`user_id` = ?" +
-		" ORDER BY `announcements`.`id` DESC" +
-		" LIMIT ? OFFSET ?"
-	args = append(args, userID, userID)
-
 	var page int
 	if c.QueryParam("page") == "" {
 		page = 1
@@ -1370,21 +1343,32 @@ func (h *handlers) GetAnnouncementList(c echo.Context) error {
 	}
 	limit := 20
 	offset := limit * (page - 1)
-	// limitより多く上限を設定し、実際にlimitより多くレコードが取得できた場合は次のページが存在する
+
+	args := []interface{}{userID, userID}
+
+	query := `SELECT a.id, a.course_id, c.name AS course_name, a.title, 
+              EXISTS(SELECT 1 FROM unread_announcements ua WHERE ua.announcement_id = a.id AND ua.user_id = ? AND NOT ua.is_deleted) AS unread
+              FROM announcements a
+              JOIN courses c ON a.course_id = c.id
+              JOIN registrations r ON c.id = r.course_id
+              WHERE r.user_id = ?`
+
+	if courseID := c.QueryParam("course_id"); courseID != "" {
+		query += " AND a.course_id = ?"
+		args = append(args, courseID)
+	}
+
+	query += ` ORDER BY a.id DESC LIMIT ? OFFSET ?`
 	args = append(args, limit+1, offset)
 
-	if err := tx.Select(&announcements, query, args...); err != nil {
+	var announcements []AnnouncementWithoutDetail
+	if err := h.DB.Select(&announcements, query, args...); err != nil {
 		c.Logger().Error(err)
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
 	var unreadCount int
-	if err := tx.Get(&unreadCount, "SELECT COUNT(*) FROM `unread_announcements` WHERE `user_id` = ? AND NOT `is_deleted`", userID); err != nil {
-		c.Logger().Error(err)
-		return c.NoContent(http.StatusInternalServerError)
-	}
-
-	if err := tx.Commit(); err != nil {
+	if err := h.DB.Get(&unreadCount, "SELECT COUNT(*) FROM `unread_announcements` WHERE `user_id` = ? AND NOT `is_deleted`", userID); err != nil {
 		c.Logger().Error(err)
 		return c.NoContent(http.StatusInternalServerError)
 	}
@@ -1415,7 +1399,6 @@ func (h *handlers) GetAnnouncementList(c echo.Context) error {
 		announcements = announcements[:len(announcements)-1]
 	}
 
-	// 対象になっているお知らせが0件の時は空配列を返却
 	announcementsRes := append(make([]AnnouncementWithoutDetail, 0, len(announcements)), announcements...)
 
 	return c.JSON(http.StatusOK, GetAnnouncementsResponse{
