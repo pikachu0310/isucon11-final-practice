@@ -17,6 +17,12 @@ func GetDB(batch bool) (*sqlx.DB, error) {
 	}
 	mysqlConfig.ParseTime = true
 	mysqlConfig.MultiStatements = batch
+	mysqlConfig.InterpolateParams = true
+
+	//func (mc *MySQLConnectionEnv) ConnectDB() (*sqlx.DB, error) {
+	//	dsn := fmt.Sprintf("%v:%v@tcp(%v:%v)/%v?parseTime=true&loc=Asia%%2FTokyo&interpolateParams=true", mc.User, mc.Password, mc.Host, mc.Port, mc.DBName)
+	//	return sqlx.Open("mysql", dsn)
+	//}
 
 	return sqlx.Open("mysql", mysqlConfig.FormatDSN())
 }
