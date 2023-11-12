@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"github.com/bytedance/sonic"
 	"github.com/kaz/pprotein/integration/standalone"
 	"github.com/motoki317/sc"
 	"io"
@@ -99,6 +100,15 @@ func txSelect(tx *sqlx.Tx, dest interface{}, query string, args ...interface{}) 
 		return err
 	}
 	return tx.Stmtx(stmt).Select(dest, args...)
+}
+
+func jsonEncode(res any) []byte {
+	b, err := sonic.Marshal(&res)
+	if err != nil {
+		panic(err)
+	}
+
+	return b
 }
 
 var db *sqlx.DB
