@@ -1220,11 +1220,11 @@ func (h *handlers) SubmitAssignment(c echo.Context) error {
 	courseID := c.Param("courseID")
 	classID := c.Param("classID")
 
-	tx, err := h.DB.Beginx()
-	if err != nil {
-		return c.NoContent(http.StatusInternalServerError)
-	}
-	defer tx.Rollback()
+	//tx, err := h.DB.Beginx()
+	//if err != nil {
+	//	return c.NoContent(http.StatusInternalServerError)
+	//}
+	//defer tx.Rollback()
 
 	var status CourseStatus
 	var registrationCount int
@@ -1232,7 +1232,7 @@ func (h *handlers) SubmitAssignment(c echo.Context) error {
 	var eg errgroup.Group
 
 	eg.Go(func() error {
-		err := txGet(tx, &status, "SELECT `status` FROM `courses` WHERE `id` = ? FOR SHARE", courseID)
+		err := dbGet(&status, "SELECT `status` FROM `courses` WHERE `id` = ? FOR SHARE", courseID)
 		if err != nil {
 			fmt.Println("bad1")
 			return err
@@ -1241,7 +1241,7 @@ func (h *handlers) SubmitAssignment(c echo.Context) error {
 	})
 
 	eg.Go(func() error {
-		err := txGet(tx, &registrationCount, "SELECT COUNT(*) FROM `registrations` WHERE `user_id` = ? AND `course_id` = ?", userID, courseID)
+		err := dbGet(&registrationCount, "SELECT COUNT(*) FROM `registrations` WHERE `user_id` = ? AND `course_id` = ?", userID, courseID)
 		if err != nil {
 			fmt.Println("bad2")
 			return err
@@ -1250,7 +1250,7 @@ func (h *handlers) SubmitAssignment(c echo.Context) error {
 	})
 
 	eg.Go(func() error {
-		err := txGet(tx, &submissionClosed, "SELECT `submission_closed` FROM `classes` WHERE `id` = ? FOR SHARE", classID)
+		err := dbGet(&submissionClosed, "SELECT `submission_closed` FROM `classes` WHERE `id` = ? FOR SHARE", classID)
 		if err != nil {
 			fmt.Println("bad3")
 			return err
@@ -1282,7 +1282,7 @@ func (h *handlers) SubmitAssignment(c echo.Context) error {
 	}
 	defer file.Close()
 
-	if _, err := txExec(tx, "INSERT INTO `submissions` (`user_id`, `class_id`, `file_name`) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE `file_name` = VALUES(`file_name`)", userID, classID, header.Filename); err != nil {
+	if _, err := dbExec("INSERT INTO `submissions` (`user_id`, `class_id`, `file_name`) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE `file_name` = VALUES(`file_name`)", userID, classID, header.Filename); err != nil {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
@@ -1296,9 +1296,9 @@ func (h *handlers) SubmitAssignment(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
-	if err := tx.Commit(); err != nil {
-		return c.NoContent(http.StatusInternalServerError)
-	}
+	//if err := tx.Commit(); err != nil {
+	//	return c.NoContent(http.StatusInternalServerError)
+	//}
 
 	return c.NoContent(http.StatusNoContent)
 }
